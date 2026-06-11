@@ -28,6 +28,18 @@ param adminUsername string = 'azureuser'
 @secure()
 param adminPassword string = ''
 
+@description('Name of the Azure Key Vault containing the admin password secret.')
+param keyVaultName string = ''
+
+@description('Name of the secret in Key Vault containing the admin password.')
+param keyVaultSecretName string = 'AdminPassword'
+
+@description('Name of the resource group where the Key Vault is located.')
+param keyVaultResourceGroupName string = ''
+
+@description('Subscription ID where the Key Vault is located. Defaults to the hub subscription.')
+param keyVaultSubscriptionId string = ''
+
 @description('Options: Bastion or AVD. Determines whether to deploy Azure Bastion with a virtual machine or Azure Virtual Desktop for remote access to the environment. Default is Bastion.')
 @allowed([
   'Bastion'
@@ -203,6 +215,9 @@ var tags = {
   Owner: solutionOwner
   WorkloadName: workloadName
 }
+
+@description('Key Vault reference ID for audit purposes. Indicates the source of the admin password.')
+var keyVaultSecretId = !empty(keyVaultName) && !empty(keyVaultResourceGroupName) ? '/subscriptions/${keyVaultSubscriptionId}/resourceGroups/${keyVaultResourceGroupName}/providers/Microsoft.KeyVault/vaults/${keyVaultName}/secrets/${keyVaultSecretName}' : ''
 
 /// ── Subscription Deployments - Foundation (VNETs, RTs, NSGs) ───────────────────────
 @description('Hub Subscription - Foundational components.')
