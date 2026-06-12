@@ -17,7 +17,8 @@ The Deploy-SRE.ps1 deployment script has been updated to use **Azure Key Vault**
 [System.String]$KeyVaultName = 'demo-kv-sre'
 [System.String]$SecretName = 'AdminPassword'
 
-$AdminPasswordSecure = (Get-AzKeyVaultSecret -VaultName $KeyVaultName -Name $SecretName -AsPlainText | ConvertTo-SecureString -AsPlainText -Force)
+$secret = Get-AzKeyVaultSecret -VaultName $KeyVaultName -Name $SecretName
+$AdminPasswordSecure = $secret.SecretValue
 ```
 
 ## Security Benefits
@@ -71,7 +72,6 @@ Key Vault Details:
   Name:              demo-kv-sre
   Resource Group:    Demo-RG-Hub-01
   Secret Name:       AdminPassword
-  Secret URI:        https://demo-kv-sre.vault.azure.net/secrets/AdminPassword
 ```
 
 ### Step 2: Update Deploy-SRE.ps1 (if needed)
@@ -92,7 +92,7 @@ Execute the deployment script as usual:
 
 The script will automatically:
 1. Retrieve the admin password from Azure Key Vault
-2. Convert it to a SecureString
+2. Use the returned SecureString value directly
 3. Pass it securely to the Bicep deployment
 
 ## How It Works
@@ -142,15 +142,17 @@ The script will automatically:
 2. You may need the "Key Vault Secrets User" or "Key Vault Administrator" role
 3. Ask your Azure administrator to grant the necessary permissions
 
-### How to verify the secret was stored correctly
+### How to verify the secret exists
 
 ```powershell
 # List all secrets in the Key Vault
 Get-AzKeyVaultSecret -VaultName "demo-kv-sre" | Format-Table
 
-# Retrieve the secret (returns the actual password in plain text)
-$secret = Get-AzKeyVaultSecret -VaultName "demo-kv-sre" -Name "AdminPassword" -AsPlainText
-Write-Host "Password is: $secret"
+# Retrieve metadata and a SecureString value without printing the password
+$secret = Get-AzKeyVaultSecret -VaultName "demo-kv-sre" -Name "AdminPassword"
+if ($null -ne $secret -and $null -ne $secret.SecretValue) {
+    Write-Host "Secret exists and returned a secure value."
+}
 ```
 
 ## Advanced: Rotating the Password
@@ -162,7 +164,7 @@ To update the admin password without modifying the deployment script:
 $newPassword = Read-Host -Prompt "Enter new admin password" -AsSecureString
 
 # Update the secret in Key Vault
-$newPassword | ConvertFrom-SecureString -AsPlainText | Set-AzKeyVaultSecret -VaultName "demo-kv-sre" -Name "AdminPassword" -Force
+Set-AzKeyVaultSecret -VaultName "demo-kv-sre" -Name "AdminPassword" -SecretValue $newPassword
 
 # The next deployment will automatically use the new password
 ```

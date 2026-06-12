@@ -18,7 +18,12 @@ Get-AzSubscription -SubscriptionId $AzSubscriptionID | Set-AzContext
 # Retrieve the admin password from Azure Key Vault
 Write-Host "Retrieving admin password from Azure Key Vault: $KeyVaultName"
 try {
-    $AdminPasswordSecure = (Get-AzKeyVaultSecret -VaultName $KeyVaultName -Name $SecretName -AsPlainText | ConvertTo-SecureString -AsPlainText -Force)
+    $adminPasswordSecret = Get-AzKeyVaultSecret -VaultName $KeyVaultName -Name $SecretName -ErrorAction Stop
+    if ($null -eq $adminPasswordSecret -or $null -eq $adminPasswordSecret.SecretValue) {
+        throw "Secret '$SecretName' was not found or did not include a secure value."
+    }
+
+    $AdminPasswordSecure = $adminPasswordSecret.SecretValue
 }
 catch {
     Write-Error "Failed to retrieve secret from Key Vault. Error: $_"
@@ -26,7 +31,7 @@ catch {
     Write-Host "SETUP INSTRUCTIONS:"
     Write-Host "1. Create a Key Vault secret by running:"
     Write-Host "   `$password = Read-Host 'Enter admin password' -AsSecureString"
-    Write-Host "   `$password | ConvertFrom-SecureString -AsPlainText | Set-AzKeyVaultSecret -VaultName '$KeyVaultName' -Name '$SecretName'"
+    Write-Host "   Set-AzKeyVaultSecret -VaultName '$KeyVaultName' -Name '$SecretName' -SecretValue `$password"
     Write-Host "2. Ensure the Key Vault is created in the hub resource group"
     Write-Host "3. Update `$KeyVaultName above with your actual Key Vault name"
     exit 1
@@ -60,4 +65,11 @@ Write-Host "Starting Bicep deployment: $DeploymentName"
 Write-Host "Location: $Location"
 Write-Host "Environment: $($ARMTemplateParameterObject['environmentName'])"
 
-New-AzDeployment -Name $DeploymentName -Location $Location -TemplateFile $GetARMTemplateFilePath -TemplateParameterObject $ARMTemplateParameterObject -ValidationLevel $ValidationLevel -Verbose
+try {
+    New-AzDeployment -Name $DeploymentName -Location $Location -TemplateFile $GetARMTemplateFilePath -TemplateParameterObject $ARMTemplateParameterObject -ValidationLevel $ValidationLevel -Verbose
+}
+finally {
+    if ($null -ne $AdminPasswordSecure) {
+        $AdminPasswordSecure.Dispose()
+    }
+}
